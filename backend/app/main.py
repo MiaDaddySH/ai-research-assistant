@@ -1,11 +1,8 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from app.schemas import ResearchRequest
+from app.agent import run_research
 
 app = FastAPI()
-
-
-class ResearchRequest(BaseModel):
-    question: str
 
 
 @app.get("/")
@@ -15,7 +12,5 @@ async def root():
 
 @app.post("/research")
 async def research(req: ResearchRequest):
-    return {
-        "question": req.question,
-        "result": "This is a placeholder research result."
-    }
+    result = await run_research(req.question)
+    return result
