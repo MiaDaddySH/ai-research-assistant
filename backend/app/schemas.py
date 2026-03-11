@@ -16,6 +16,7 @@ class ArticleItem(BaseModel):
     url: str
     snippet: str
     article_content: str
+    article_summary: str | None = None
 
 
 class ResearchResponse(BaseModel):
