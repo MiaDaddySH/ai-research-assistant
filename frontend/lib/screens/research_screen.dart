@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/research_response.dart';
 import '../services/api_service.dart';
@@ -13,6 +14,12 @@ class ResearchScreen extends StatefulWidget {
 class _ResearchScreenState extends State<ResearchScreen> {
   final TextEditingController _questionController = TextEditingController();
   final ApiService _apiService = ApiService();
+
+  static const List<String> _exampleQuestions = [
+    'What are the latest developments in AI coding assistants?',
+    'How are AI agents changing software engineering workflows?',
+    'What are the recent trends in open-source large language models?',
+  ];
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -51,6 +58,31 @@ class _ResearchScreenState extends State<ResearchScreen> {
     }
   }
 
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid URL')),
+      );
+      return;
+    }
+
+    final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open link')),
+      );
+    }
+  }
+
+  void _applyExampleQuestion(String question) {
+    setState(() {
+      _questionController.text = question;
+      _errorMessage = null;
+    });
+  }
+
   Widget _buildInputCard() {
     return Card(
       child: Padding(
@@ -71,6 +103,24 @@ class _ResearchScreenState extends State<ResearchScreen> {
                 hintText: 'What are the latest developments in AI coding assistants?',
                 border: OutlineInputBorder(),
               ),
+              onSubmitted: (_) {
+                if (!_isLoading) {
+                  _submitResearch();
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _exampleQuestions
+                  .map(
+                    (question) => ActionChip(
+                      label: Text(question),
+                      onPressed: () => _applyExampleQuestion(question),
+                    ),
+                  )
+                  .toList(),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -222,6 +272,8 @@ class _ResearchScreenState extends State<ResearchScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () => _openUrl(source.url),
               ),
             )
             .toList(),

@@ -7,8 +7,10 @@ from typing import Any
 from tavily import TavilyClient
 
 from app.config import get_settings
+from app.logger import setup_logger
 
 settings = get_settings()
+logger = setup_logger()
 client = TavilyClient(api_key=settings.tavily_api_key)
 
 
@@ -17,6 +19,13 @@ def _search_web_sync(query: str, max_results: int) -> list[dict[str, str]]:
 
     for attempt in range(3):
         try:
+            logger.info(
+                "Starting Tavily search | attempt=%s | query=%s | max_results=%s",
+                attempt + 1,
+                query,
+                max_results,
+            )
+
             response: dict[str, Any] = client.search(
                 query=query,
                 search_depth="advanced",
@@ -35,12 +44,18 @@ def _search_web_sync(query: str, max_results: int) -> list[dict[str, str]]:
                     }
                 )
 
+            logger.info("Tavily search succeeded | results=%s", len(normalized_results))
             return normalized_results
 
         except Exception as exc:
             last_error = exc
+            logger.warning(
+                "Tavily search failed | attempt=%s | error=%s",
+                attempt + 1,
+                exc,
+            )
             if attempt < 2:
-                time.sleep(1.0 * (attempt + 1))
+                time.sleep(attempt + 1)
 
     raise RuntimeError(f"Tavily search failed after retries: {last_error}") from last_error
 

@@ -20,7 +20,7 @@ class ArticleItem(BaseModel):
     url: str
     snippet: str
     article_content: str
-    article_summary: str | None = None
+    article_summary: str = ""
 
 
 # 代表研究结果的输出模型，包含用户提问、综合总结、关键要点、信息来源列表和文章详情列表等

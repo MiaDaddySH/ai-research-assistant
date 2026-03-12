@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 
 from app.config import get_settings
+from app.logger import setup_logger
 from app.schemas import ArticleItem, ResearchResponse, SourceItem
 from app.services.openai_client import summarize_article, synthesize_research
 from app.tools.fetch import fetch_article_content
 from app.tools.search import search_web
 
 settings = get_settings()
+logger = setup_logger()
 
 
 def _is_valid_article_summary(summary: str) -> bool:
@@ -26,17 +28,22 @@ async def process_article(question: str, item: dict[str, str]) -> ArticleItem:
     url = item.get("url", "")
     snippet = item.get("content", "")
 
+    logger.info("Processing article | title=%s | url=%s", title, url)
+
     article_content = await fetch_article_content(url)
 
     if article_content.startswith("Failed") or article_content.startswith("No article"):
         article_summary = (
             "Unable to generate summary because article content could not be extracted."
         )
+        logger.warning("Article extraction failed | title=%s", title)
     else:
         try:
             article_summary = await summarize_article(question, article_content)
+            logger.info("Article summary generated | title=%s", title)
         except Exception as exc:
             article_summary = f"Failed to summarize article: {exc}"
+            logger.warning("Article summarization failed | title=%s | error=%s", title, exc)
 
     return ArticleItem(
         title=title,
@@ -61,7 +68,7 @@ def _build_article_summaries(articles: list[ArticleItem]) -> list[str]:
 
     for article in articles:
         summary = article.article_summary
-        if summary is not None and _is_valid_article_summary(summary):
+        if _is_valid_article_summary(summary):
             article_summaries.append(summary)
 
     return article_summaries
@@ -73,9 +80,12 @@ def _build_fallback_key_points(articles: list[ArticleItem]) -> list[str]:
 
 
 async def run_research(question: str) -> ResearchResponse:
+    logger.info("Research request received | question=%s", question)
+
     try:
         search_results = await search_web(question)
     except Exception as exc:
+        logger.error("Research failed during web search | error=%s", exc)
         return ResearchResponse(
             question=question,
             summary=f"Research failed during web search: {exc}",
@@ -85,6 +95,7 @@ async def run_research(question: str) -> ResearchResponse:
         )
 
     if not search_results:
+        logger.info("No search results found")
         return ResearchResponse(
             question=question,
             summary="No search results were found for this question.",
@@ -95,11 +106,13 @@ async def run_research(question: str) -> ResearchResponse:
 
     semaphore = asyncio.Semaphore(settings.max_article_concurrency)
 
-    tasks = [_process_article_with_limit(semaphore, question, item) for item in search_results]
+    tasks = [
+        _process_article_with_limit(semaphore, question, item)
+        for item in search_results
+    ]
     articles = await asyncio.gather(*tasks)
 
     sources = [SourceItem(title=article.title, url=article.url) for article in articles]
-
     article_summaries = _build_article_summaries(articles)
 
     final_summary, final_key_points = await synthesize_research(
@@ -109,6 +122,13 @@ async def run_research(question: str) -> ResearchResponse:
 
     if not final_key_points:
         final_key_points = _build_fallback_key_points(articles)
+
+    logger.info(
+        "Research completed | sources=%s | valid_summaries=%s | key_points=%s",
+        len(sources),
+        len(article_summaries),
+        len(final_key_points),
+    )
 
     return ResearchResponse(
         question=question,
