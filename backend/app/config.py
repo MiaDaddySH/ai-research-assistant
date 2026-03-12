@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     summary_max_input_chars: int = 6000
     article_fetch_timeout_seconds: float = 10.0
     article_min_length: int = 200
+    max_article_concurrency: int = 3
 
     model_config = SettingsConfigDict(
         env_file=".env",

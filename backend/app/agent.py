@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import asyncio
 
+from app.config import get_settings
 from app.schemas import ArticleItem, ResearchResponse, SourceItem
 from app.services.openai_client import summarize_article, synthesize_research
 from app.tools.fetch import fetch_article_content
 from app.tools.search import search_web
+
+settings = get_settings()
 
 
 def _is_valid_article_summary(summary: str | None) -> bool:
@@ -48,19 +51,30 @@ async def process_article(question: str, item: dict[str, str]) -> ArticleItem:
     )
 
 
+async def _process_article_with_limit(
+    semaphore: asyncio.Semaphore,
+    question: str,
+    item: dict[str, str],
+) -> ArticleItem:
+    async with semaphore:
+        return await process_article(question, item)
+
+
 async def run_research(question: str) -> ResearchResponse:
     search_results = await search_web(question)
 
-    tasks = [process_article(question, item) for item in search_results]
+    semaphore = asyncio.Semaphore(settings.max_article_concurrency)
+
+    tasks = [_process_article_with_limit(semaphore, question, item) for item in search_results]
     articles = await asyncio.gather(*tasks)
 
     sources = [SourceItem(title=article.title, url=article.url) for article in articles]
 
-    article_summaries: list[str] = [
-        summary
-        for article in articles
-        if (summary := article.article_summary) is not None and _is_valid_article_summary(summary)
-    ]
+    article_summaries: list[str] = []
+    for article in articles:
+        summary = article.article_summary
+        if summary is not None and _is_valid_article_summary(summary):
+            article_summaries.append(summary)
 
     final_summary, final_key_points = await synthesize_research(
         question=question,
