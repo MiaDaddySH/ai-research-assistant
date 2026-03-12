@@ -13,12 +13,14 @@ from app.config import get_settings
 
 settings = get_settings()
 
+# 初始化OpenAI客户端，使用Azure OpenAI的API密钥和端点URL
 client = AsyncOpenAI(
     api_key=settings.azure_openai_api_key,
     base_url=settings.azure_openai_base_url,
 )
 
 
+# 构建用于文章总结的消息列表，包含系统提示和用户提示，指导模型生成相关且简洁的总结
 def build_article_summary_messages(
     question: str,
     article_content: str,
@@ -58,6 +60,7 @@ Requirements:
     return [system_message, user_message]
 
 
+# 定义一个异步函数，使用OpenAI的Chat Completions API生成文章总结，并处理可能的错误情况
 async def summarize_article(question: str, article_content: str) -> str:
     if not article_content.strip():
         return "Article content is empty, so no summary could be generated."
@@ -75,6 +78,7 @@ async def summarize_article(question: str, article_content: str) -> str:
     return content.strip() if content else "No summary returned by the model."
 
 
+# 构建用于研究综合总结的消息列表，包含系统提示和用户提示，指导模型根据多个文章总结生成最终的研究结果
 def build_research_synthesis_messages(
     question: str,
     article_summaries: list[str],
@@ -130,6 +134,7 @@ Requirements:
     return [system_message, user_message]
 
 
+# 定义一个异步函数，使用OpenAI的Chat Completions API生成研究综合总结，并处理可能的错误情况
 async def synthesize_research(
     question: str,
     article_summaries: list[str],

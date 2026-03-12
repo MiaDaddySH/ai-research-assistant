@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'screens/research_screen.dart';
 
 void main() {
@@ -14,6 +15,7 @@ class MyApp extends StatelessWidget {
       title: 'AI Research Assistant',
       theme: ThemeData(
         useMaterial3: true,
+        colorSchemeSeed: Colors.blue,
       ),
       home: const ResearchScreen(),
     );

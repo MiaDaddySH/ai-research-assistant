@@ -5,6 +5,7 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# 代表应用的配置设置，包含API密钥、端点URL、研究参数等
 class Settings(BaseSettings):
     tavily_api_key: str
 
@@ -30,6 +31,7 @@ class Settings(BaseSettings):
         return f"{self.azure_openai_endpoint.rstrip('/')}/openai/v1/"
 
 
+# 使用lru_cache装饰器缓存设置实例，确保全局只创建一个Settings对象
 @lru_cache
 def get_settings() -> Settings:
     return Settings()  # pyright: ignore[reportCallIssue]

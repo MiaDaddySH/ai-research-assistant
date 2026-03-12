@@ -11,6 +11,7 @@ from app.tools.search import search_web
 settings = get_settings()
 
 
+# 辅助函数，检查生成的文章总结是否有效，过滤掉无效或空的总结
 def _is_valid_article_summary(summary: str | None) -> bool:
     if summary is None:
         return False
@@ -25,6 +26,7 @@ def _is_valid_article_summary(summary: str | None) -> bool:
     return bool(summary.strip()) and not summary.startswith(invalid_prefixes)
 
 
+# 处理单个文章的函数，负责提取文章内容并生成总结
 async def process_article(question: str, item: dict[str, str]) -> ArticleItem:
     title = item.get("title", "")
     url = item.get("url", "")
@@ -51,6 +53,7 @@ async def process_article(question: str, item: dict[str, str]) -> ArticleItem:
     )
 
 
+# 研究的主函数，负责整体流程：搜索、处理文章、综合总结等
 async def _process_article_with_limit(
     semaphore: asyncio.Semaphore,
     question: str,
@@ -60,6 +63,7 @@ async def _process_article_with_limit(
         return await process_article(question, item)
 
 
+# 研究的入口函数，负责协调搜索、处理文章和综合总结等流程
 async def run_research(question: str) -> ResearchResponse:
     search_results = await search_web(question)
 
