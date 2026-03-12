@@ -1,16 +1,22 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from __future__ import annotations
+
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-
-    # Tavily
     tavily_api_key: str
 
-    # Azure OpenAI
-    azure_openai_api_key: str | None = None
-    azure_openai_endpoint: str | None = None
-    azure_openai_deployment: str | None = None
+    azure_openai_api_key: str
+    azure_openai_endpoint: str
+    azure_openai_deployment: str
+
+    research_max_results: int = 3
+    fetch_max_chars: int = 8000
+    summary_max_input_chars: int = 6000
+    article_fetch_timeout_seconds: float = 10.0
+    article_min_length: int = 200
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -18,7 +24,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @property
+    def azure_openai_base_url(self) -> str:
+        return f"{self.azure_openai_endpoint.rstrip('/')}/openai/v1/"
+
 
 @lru_cache
-def get_settings():
-    return Settings()
+def get_settings() -> Settings:
+    return Settings()  # pyright: ignore[reportCallIssue]

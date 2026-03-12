@@ -1,40 +1,72 @@
+from __future__ import annotations
+
 from openai import AsyncOpenAI
+from openai.types.chat import (
+    ChatCompletionMessageParam,
+    ChatCompletionSystemMessageParam,
+    ChatCompletionUserMessageParam,
+)
+
 from app.config import get_settings
 
 settings = get_settings()
 
 client = AsyncOpenAI(
     api_key=settings.azure_openai_api_key,
-    base_url=f"{settings.azure_openai_endpoint.rstrip('/')}/openai/v1/",
+    base_url=settings.azure_openai_base_url,
 )
 
-async def summarize_article(question: str, article_content: str) -> str:
 
-    trimmed_content = article_content[:6000]
+def build_article_summary_messages(
+    question: str, article_content: str
+) -> list[ChatCompletionMessageParam]:
+    trimmed_content = article_content[: settings.summary_max_input_chars]
 
-    system_prompt = (
-        "You are a helpful research assistant. "
-        "Summarize the article clearly and concisely based on the user's question."
-    )
+    system_message: ChatCompletionSystemMessageParam = {
+        "role": "system",
+        "content": (
+            "You are a careful research assistant. "
+            "Summarize the article in a concise and factual way based on the user's question. "
+            "Focus only on relevant developments, facts, and insights. "
+            "Do not invent information."
+        ),
+    }
 
-    user_prompt = f"""
+    user_message: ChatCompletionUserMessageParam = {
+        "role": "user",
+        "content": f"""
 User question:
 {question}
 
 Article content:
 {trimmed_content}
 
-Write a concise summary (4-6 sentences).
-"""
+Task:
+Write a concise summary of this article that helps answer the user's question.
+
+Requirements:
+- Use 4 to 6 sentences.
+- Focus on the most relevant information.
+- Avoid bullet points.
+- Avoid speculation.
+""".strip(),
+    }
+
+    return [system_message, user_message]
+
+
+async def summarize_article(question: str, article_content: str) -> str:
+    if not article_content.strip():
+        return "Article content is empty, so no summary could be generated."
+
+    messages = build_article_summary_messages(question, article_content)
 
     response = await client.chat.completions.create(
         model=settings.azure_openai_deployment,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.3,
+        messages=messages,
+        temperature=0.2,
         max_tokens=300,
     )
 
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+    return content.strip() if content else "No summary returned by the model."

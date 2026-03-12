@@ -1,9 +1,10 @@
-from pydantic import BaseModel
-from typing import List
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
 
 
 class ResearchRequest(BaseModel):
-    question: str
+    question: str = Field(..., min_length=3, max_length=500)
 
 
 class SourceItem(BaseModel):
@@ -22,6 +23,6 @@ class ArticleItem(BaseModel):
 class ResearchResponse(BaseModel):
     question: str
     summary: str
-    key_points: List[str]
-    sources: List[SourceItem]
-    articles: List[ArticleItem]
+    key_points: list[str]
+    sources: list[SourceItem]
+    articles: list[ArticleItem]

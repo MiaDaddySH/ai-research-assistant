@@ -1,12 +1,18 @@
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
 from tavily import TavilyClient
+
 from app.config import get_settings
 
 settings = get_settings()
-
 client = TavilyClient(api_key=settings.tavily_api_key)
 
-async def search_web(query: str, max_results: int = 5) -> list[dict]:
-    response = client.search(
+
+def _search_web_sync(query: str, max_results: int) -> list[dict[str, str]]:
+    response: dict[str, Any] = client.search(
         query=query,
         search_depth="advanced",
         max_results=max_results,
@@ -14,11 +20,19 @@ async def search_web(query: str, max_results: int = 5) -> list[dict]:
 
     results = response.get("results", [])
 
-    return [
-        {
-            "title": item.get("title", ""),
-            "url": item.get("url", ""),
-            "content": item.get("content", ""),
-        }
-        for item in results
-    ]
+    normalized_results: list[dict[str, str]] = []
+    for item in results:
+        normalized_results.append(
+            {
+                "title": item.get("title", "") or "",
+                "url": item.get("url", "") or "",
+                "content": item.get("content", "") or "",
+            }
+        )
+
+    return normalized_results
+
+
+async def search_web(query: str, max_results: int | None = None) -> list[dict[str, str]]:
+    final_max_results = max_results or settings.research_max_results
+    return await asyncio.to_thread(_search_web_sync, query, final_max_results)
