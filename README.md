@@ -182,10 +182,19 @@ flutter pub get
 flutter run
 ```
 
-Default API base URL is set in `frontend/lib/services/api_service.dart`:
+Set API base URL with `dart-define`:
 
-- iOS simulator / macOS host: `http://127.0.0.1:8000`
-- Android emulator: `http://10.0.2.2:8000`
+```bash
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000
+```
+
+Android emulator example:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
+```
+
+If `API_BASE_URL` is not provided, the app uses `http://127.0.0.1:8000` by default.
 
 ---
 
