@@ -14,8 +14,14 @@ class SourceItem(BaseModel):
     url: str
 
 
-# 代表每个搜索结果的详细信息，包括标题、URL、内容摘要、全文内容和文章总结等
 class ArticleItem(BaseModel):
+    title: str
+    url: str
+    snippet: str
+    article_summary: str = ""
+
+
+class ArticleProcessingItem(BaseModel):
     title: str
     url: str
     snippet: str
@@ -23,7 +29,6 @@ class ArticleItem(BaseModel):
     article_summary: str = ""
 
 
-# 代表研究结果的输出模型，包含用户提问、综合总结、关键要点、信息来源列表和文章详情列表等
 class ResearchResponse(BaseModel):
     question: str
     summary: str

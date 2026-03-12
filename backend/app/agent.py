@@ -4,7 +4,7 @@ import asyncio
 
 from app.config import get_settings
 from app.logger import setup_logger
-from app.schemas import ArticleItem, ResearchResponse, SourceItem
+from app.schemas import ArticleItem, ArticleProcessingItem, ResearchResponse, SourceItem
 from app.services.openai_client import summarize_article, synthesize_research
 from app.tools.fetch import fetch_article_content
 from app.tools.search import search_web
@@ -23,20 +23,26 @@ def _is_valid_article_summary(summary: str) -> bool:
     return bool(summary.strip()) and not summary.startswith(invalid_prefixes)
 
 
-async def process_article(question: str, item: dict[str, str]) -> ArticleItem:
+async def process_article(question: str, item: dict[str, str]) -> ArticleProcessingItem:
     title = item.get("title", "")
     url = item.get("url", "")
     snippet = item.get("content", "")
 
     logger.info("Processing article | title=%s | url=%s", title, url)
 
-    article_content = await fetch_article_content(url)
+    fetch_result = await fetch_article_content(url)
+    article_content = fetch_result.content
 
-    if article_content.startswith("Failed") or article_content.startswith("No article"):
+    if fetch_result.error:
         article_summary = (
             "Unable to generate summary because article content could not be extracted."
         )
-        logger.warning("Article extraction failed | title=%s", title)
+        logger.warning(
+            "Article extraction failed | title=%s | url=%s | error=%s",
+            title,
+            url,
+            fetch_result.error,
+        )
     else:
         try:
             article_summary = await summarize_article(question, article_content)
@@ -45,7 +51,7 @@ async def process_article(question: str, item: dict[str, str]) -> ArticleItem:
             article_summary = f"Failed to summarize article: {exc}"
             logger.warning("Article summarization failed | title=%s | error=%s", title, exc)
 
-    return ArticleItem(
+    return ArticleProcessingItem(
         title=title,
         url=url,
         snippet=snippet,
@@ -58,12 +64,12 @@ async def _process_article_with_limit(
     semaphore: asyncio.Semaphore,
     question: str,
     item: dict[str, str],
-) -> ArticleItem:
+) -> ArticleProcessingItem:
     async with semaphore:
         return await process_article(question, item)
 
 
-def _build_article_summaries(articles: list[ArticleItem]) -> list[str]:
+def _build_article_summaries(articles: list[ArticleProcessingItem]) -> list[str]:
     article_summaries: list[str] = []
 
     for article in articles:
@@ -74,7 +80,7 @@ def _build_article_summaries(articles: list[ArticleItem]) -> list[str]:
     return article_summaries
 
 
-def _build_fallback_key_points(articles: list[ArticleItem]) -> list[str]:
+def _build_fallback_key_points(articles: list[ArticleProcessingItem]) -> list[str]:
     fallback_key_points = [article.title for article in articles if article.title]
     return fallback_key_points[:3]
 
@@ -106,14 +112,11 @@ async def run_research(question: str) -> ResearchResponse:
 
     semaphore = asyncio.Semaphore(settings.max_article_concurrency)
 
-    tasks = [
-        _process_article_with_limit(semaphore, question, item)
-        for item in search_results
-    ]
-    articles = await asyncio.gather(*tasks)
+    tasks = [_process_article_with_limit(semaphore, question, item) for item in search_results]
+    processed_articles = await asyncio.gather(*tasks)
 
-    sources = [SourceItem(title=article.title, url=article.url) for article in articles]
-    article_summaries = _build_article_summaries(articles)
+    sources = [SourceItem(title=article.title, url=article.url) for article in processed_articles]
+    article_summaries = _build_article_summaries(processed_articles)
 
     final_summary, final_key_points = await synthesize_research(
         question=question,
@@ -121,7 +124,17 @@ async def run_research(question: str) -> ResearchResponse:
     )
 
     if not final_key_points:
-        final_key_points = _build_fallback_key_points(articles)
+        final_key_points = _build_fallback_key_points(processed_articles)
+
+    articles = [
+        ArticleItem(
+            title=article.title,
+            url=article.url,
+            snippet=article.snippet,
+            article_summary=article.article_summary,
+        )
+        for article in processed_articles
+    ]
 
     logger.info(
         "Research completed | sources=%s | valid_summaries=%s | key_points=%s",
