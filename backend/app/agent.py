@@ -11,22 +11,16 @@ from app.tools.search import search_web
 settings = get_settings()
 
 
-# 辅助函数，检查生成的文章总结是否有效，过滤掉无效或空的总结
-def _is_valid_article_summary(summary: str | None) -> bool:
-    if summary is None:
-        return False
-
+def _is_valid_article_summary(summary: str) -> bool:
     invalid_prefixes = (
         "Failed",
         "Unable",
         "No summary returned",
         "Article content is empty",
     )
-
     return bool(summary.strip()) and not summary.startswith(invalid_prefixes)
 
 
-# 处理单个文章的函数，负责提取文章内容并生成总结
 async def process_article(question: str, item: dict[str, str]) -> ArticleItem:
     title = item.get("title", "")
     url = item.get("url", "")
@@ -53,7 +47,6 @@ async def process_article(question: str, item: dict[str, str]) -> ArticleItem:
     )
 
 
-# 研究的主函数，负责整体流程：搜索、处理文章、综合总结等
 async def _process_article_with_limit(
     semaphore: asyncio.Semaphore,
     question: str,
@@ -63,9 +56,42 @@ async def _process_article_with_limit(
         return await process_article(question, item)
 
 
-# 研究的入口函数，负责协调搜索、处理文章和综合总结等流程
+def _build_article_summaries(articles: list[ArticleItem]) -> list[str]:
+    article_summaries: list[str] = []
+
+    for article in articles:
+        summary = article.article_summary
+        if summary is not None and _is_valid_article_summary(summary):
+            article_summaries.append(summary)
+
+    return article_summaries
+
+
+def _build_fallback_key_points(articles: list[ArticleItem]) -> list[str]:
+    fallback_key_points = [article.title for article in articles if article.title]
+    return fallback_key_points[:3]
+
+
 async def run_research(question: str) -> ResearchResponse:
-    search_results = await search_web(question)
+    try:
+        search_results = await search_web(question)
+    except Exception as exc:
+        return ResearchResponse(
+            question=question,
+            summary=f"Research failed during web search: {exc}",
+            key_points=[],
+            sources=[],
+            articles=[],
+        )
+
+    if not search_results:
+        return ResearchResponse(
+            question=question,
+            summary="No search results were found for this question.",
+            key_points=[],
+            sources=[],
+            articles=[],
+        )
 
     semaphore = asyncio.Semaphore(settings.max_article_concurrency)
 
@@ -74,11 +100,7 @@ async def run_research(question: str) -> ResearchResponse:
 
     sources = [SourceItem(title=article.title, url=article.url) for article in articles]
 
-    article_summaries: list[str] = []
-    for article in articles:
-        summary = article.article_summary
-        if summary is not None and _is_valid_article_summary(summary):
-            article_summaries.append(summary)
+    article_summaries = _build_article_summaries(articles)
 
     final_summary, final_key_points = await synthesize_research(
         question=question,
@@ -86,8 +108,7 @@ async def run_research(question: str) -> ResearchResponse:
     )
 
     if not final_key_points:
-        fallback_key_points = [article.title for article in articles if article.title]
-        final_key_points = fallback_key_points[:3]
+        final_key_points = _build_fallback_key_points(articles)
 
     return ResearchResponse(
         question=question,
