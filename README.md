@@ -1,5 +1,11 @@
 # AI Research Assistant
 
+[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-API-green)](https://fastapi.tiangolo.com/)
+[![Azure OpenAI](https://img.shields.io/badge/Azure-OpenAI-blue)](https://azure.microsoft.com/en-us/products/ai-services/openai-service)
+[![Flutter](https://img.shields.io/badge/Flutter-App-02569B)](https://flutter.dev/)
+[![Tavily](https://img.shields.io/badge/Tavily-WebSearch-orange)](https://tavily.com/)
+
 An end-to-end AI research assistant that searches the web, extracts article content, summarizes each source, and synthesizes a final answer.
 
 Tech stack: **FastAPI + Tavily + Azure OpenAI + Flutter**
